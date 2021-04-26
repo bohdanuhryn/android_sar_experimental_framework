@@ -1,0 +1,41 @@
+- Notice that we use Markov models in this paper mainly for the purpose of simplification of analysis. The idea, however, can be extended to other non-Markov models with general distributions which may capture the user behavior and aging process more appropriately.
+- Додати в модель стан виснаження батареї
+- Кластерний аналіз додатків, які впливають на процес старіння
+
+Common:
+
+# Android Debug Bridge: https://developer.android.com/studio/command-line/adb
+# Android Vitals: https://developer.android.com/topic/performance/vitals
+# Bug reports: https://developer.android.com/studio/debug/bug-report
+
+Monitor:
+
+- Launch Time (LT): Activity launch time collected by logcat
+https://developer.android.com/topic/performance/vitals/launch-time
+I / ActivityManager(1097): Displayed com.example.myapp/. MainActivity: +100ms
+
+- (new) Framestats (FS): 
+https://developer.android.com/training/testing/performance
+https://developer.android.com/topic/performance/vitals/frozen
+https://developer.android.com/topic/performance/vitals/render
+
+- (new) Application Not Response (ANR):
+https://developer.android.com/topic/performance/vitals/anr
+
+- (new) Exceptions (EX):
+https://developer.android.com/topic/performance/vitals/crash
+
+- Proportional Set Size (PSS):
+https://developer.android.com/studio/command-line/perfetto
+
+- Free & Cached Memory (FM/CM):
+
+- Garbage Collector (GC): paused; total;
+
+- (new) Battery Power (BP):
+https://developer.android.com/topic/performance/vitals/wakeup
+https://developer.android.com/topic/performance/vitals/wakelock
+https://developer.android.com/topic/performance/power/setup-battery-historian
+https://developer.android.com/topic/performance/power/battery-historian#asd
+
+Workload:
