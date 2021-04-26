@@ -13,6 +13,8 @@ function InitOutputDirs
     CreateFileIfNotExists -Path ".\output\$Output" -Name "logcat" -Type "directory"
     # Dumpsys dir
     CreateFileIfNotExists -Path ".\output\$Output" -Name "dumpsys" -Type "directory"
+    # ProcTasks dir
+    CreateFileIfNotExists -Path ".\output\$Output" -Name "proctasks" -Type "directory"
 }
 
 function BugReportsMonitor 
@@ -62,6 +64,24 @@ function LogCatMonitor
     Get-Date | Out-File -FilePath $path -Append
     adb logcat -d -v monotonic | Out-File -FilePath $path -Append
     adb logcat -c
+}
+
+function ProcTasksMonitor {
+    Param([String] $Output)
+    Write-Host "ProcTasks call"
+    $path = ".\output\$Output\proctasks\proctasks.txt"
+    Get-Date | Out-File -FilePath $path -Append
+    $dirs_str = adb shell ls /proc/
+    $dirs_str = $dirs_str.Split(' ')
+    $dirs_str = @($dirs_str) -match '^\d+$'
+
+    $dirs_str_full = $dirs_str | ForEach-Object { "/proc/" + $_ + "/stat" }
+
+    $res = adb shell cat ($dirs_str_full -join ' ')
+
+    if ($null -ne $res) {
+        $res | Out-File -FilePath $path -Append
+    }
 }
 
 function CreateFileIfNotExists

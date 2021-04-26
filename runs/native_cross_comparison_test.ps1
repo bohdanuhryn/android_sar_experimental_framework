@@ -54,6 +54,7 @@ function RunMonitors
     DumpsysServiceMonitor -Output $Output -Service meminfo -OptionalParams "-c"
     DumpsysServiceMonitor -Output $Output -Service graphicsstats -OptionalParams framestats
     LogCatMonitor -Output $Output -OptionalParams "*:I"
+    ProcTasksMonitor -Output $Output
 }
 
 $outputNativeMultipleApps = "native_multiple_apps_test"
