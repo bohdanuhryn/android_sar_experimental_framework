@@ -31,12 +31,12 @@ function RunMonkey
     if ($EnableEvents -and $EnableSwitches)
     {
         #$eventsParams = "--pct-touch 15 --pct-motion 10 --pct-trackball 15 --pct-nav 20 --pct-majornav 15 --pct-syskeys 5 --pct-appswitch 10 --pct-anyevent 5 --pct-flip 2 --pct-pinchzoom 3 --pct-permission 0"
-        $eventsParams = "--pct-touch 20 --pct-motion 10 --pct-trackball 15 --pct-nav 20 --pct-majornav 15 --pct-syskeys 4 --pct-appswitch 10 --pct-anyevent 0 --pct-flip 3 --pct-pinchzoom 3"
+        $eventsParams = "--pct-touch 20 --pct-motion 15 --pct-trackball 15 --pct-nav 20 --pct-majornav 15 --pct-syskeys 3 --pct-appswitch 10 --pct-anyevent 0 --pct-flip 1 --pct-pinchzoom 1"
     }
     elseif ($EnableEvents)
     {
         #$eventsParams = "--pct-touch 15 --pct-motion 10 --pct-trackball 15 --pct-nav 25 --pct-majornav 15 --pct-syskeys 10 --pct-anyevent 5 --pct-flip 2 --pct-pinchzoom 3 --pct-permission 0"
-        $eventsParams = "--pct-touch 15 --pct-motion 10 --pct-trackball 15 --pct-nav 25 --pct-majornav 15 --pct-syskeys 10 --pct-anyevent 5 --pct-flip 2 --pct-pinchzoom 3"
+        $eventsParams = "--pct-touch 20 --pct-motion 15 --pct-trackball 15 --pct-nav 20 --pct-majornav 15 --pct-syskeys 5 --pct-anyevent 5 --pct-flip 2 --pct-pinchzoom 3"
     }
     elseif ($EnableSwitches)
     {
