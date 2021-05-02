@@ -21,8 +21,10 @@ function RunStressTest {
         }
         if (($i -gt 0) -and ($WorkloadDurationTicks -gt 0) -and ($PauseDurationSeconds -gt 0)) {
             if (($i % $WorkloadDurationTicks) -eq 0) {
+                Write-Host "Pause begin for $PauseDurationSeconds"
                 $sec = 0
                 while ($sec -lt $PauseDurationSeconds) {
+                    Write-Host "Pause sec = $sec"
                     Start-Sleep -s 25
                     & $Monitor
                     $sec = $sec + 30#TODO: fix pause timing - remove hardcoded 20/30

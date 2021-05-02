@@ -45,22 +45,20 @@ function RunNativeCleaners { RunCleaners -Packages $packagesNative }
 function RunNativeWorkload { RunWorkloadGenerators -Packages $packagesNative }
 function RunNativeMultipleAppsMonitor { RunMonitors -Output $outputNativeMultipleApps -Packages $packagesNative }
 function RunNativeUsageDelaysMonitor { RunMonitors -Output $outputNativeUsageDelays -Packages $packagesNative }
-function RunNativeMultipleAppsTest
-{
+function RunNativeMultipleAppsTest {
     InitOutputDirs -Output $outputNativeMultipleApps -Packages $packagesNative
     RestartPackages -Packages $packagesNative
     RunStressTest -IntervalsCount 600 -Cleaner 'RunNativeCleaners' -WorkloadGenerator 'RunNativeWorkload' -Monitor 'RunNativeMultipleAppsMonitor' -ActionTime 200 -OnTimeAction 'RestartNativeApps'
 }
-function RunNativeUsageDelaysTest
-{
+function RunNativeUsageDelaysTest {
     InitOutputDirs -Output $outputNativeMultipleApps -Packages $packagesNativeApps
     RestartPackages -Packages $packagesNativeApps
-    RunStressTest -IntervalsCount 400 -Cleaner 'RunNativeCleaners' -WorkloadGenerator 'RunNativeWorkload' -Monitor 'RunNativeUsageDelaysMonitor' -ActionTime 150 -OnTimeAction 'RestartNativeApps' -WorkloadDurationTicks 100 -PauseDurationSeconds 30 * 60
+    RunStressTest -IntervalsCount 400 -Cleaner 'RunNativeCleaners' -WorkloadGenerator 'RunNativeWorkload' -Monitor 'RunNativeUsageDelaysMonitor' -ActionTime 150 -OnTimeAction 'RestartNativeApps' -WorkloadDurationTicks 100 -PauseDurationSeconds 1800
 }
 
 ### Flutter
 
-$packagesFlutter = "com.reflectlyApp", "com.hamilton.app", "com.ebay.motorsapp", "com.spotlightsix.zentimerlite2", "com.grab.merchant"#, "com.google.stadia.android"
+$packagesFlutter = "com.reflectlyApp", "com.hamilton.app", "com.ebay.motorsapp", "com.spotlightsix.zentimerlite2", "com.mgmresorts.mgmresorts"#,"com.grab.merchant", "com.google.stadia.android"
 $outputFlutterMultipleApps = "flutter_multiple_apps_test"
 $outputFlutterUsageDelays = "flutter_usage_delays_test"
 function RestartFlutterApps { RestartPackages -Packages $packagesFlutter }
@@ -68,32 +66,21 @@ function RunFlutterCleaners { RunCleaners -Packages $packagesFlutter }
 function RunFlutterWorkload { RunWorkloadGenerators -Packages $packagesFlutter }
 function RunFlutterMultipleAppsMonitor { RunMonitors -Output $outputFlutterMultipleApps -Packages $packagesFlutter }
 function RunFlutterUsageDelaysMonitor { RunMonitors -Output $outputFlutterUsageDelays -Packages $packagesFlutter }
-function RunFlutterMultipleAppsTest
-{
+function RunFlutterMultipleAppsTest {
     InitOutputDirs -Output $outputFlutterMultipleApps -Packages $packagesFlutter
     RestartPackages -Packages $packagesFlutter
     RunStressTest -IntervalsCount 600 -Cleaner 'RunFlutterCleaners' -WorkloadGenerator 'RunFlutterWorkload' -Monitor 'RunFlutterMultipleAppsMonitor'  -ActionTime 200 -OnTimeAction 'RestartFlutterApps'
 }
-function RunFlutterUsageDelaysTest
-{
-    InitOutputDirs -Output $outputFlutterMultipleApps -Packages $packagesFlutter
+function RunFlutterUsageDelaysTest {
+    InitOutputDirs -Output $outputFlutterUsageDelays -Packages $packagesFlutter
     RestartPackages -Packages $packagesFlutter
-    RunStressTest -IntervalsCount 400 -Cleaner 'RunFlutterCleaners' -WorkloadGenerator 'RunFlutterWorkload' -Monitor 'RunFlutterUsageDelaysMonitor' -ActionTime 150 -OnTimeAction 'RestartFlutterApps' -WorkloadDurationTicks 100 -PauseDurationSeconds 30 * 60 
+    RunStressTest -IntervalsCount 400 -Cleaner 'RunFlutterCleaners' -WorkloadGenerator 'RunFlutterWorkload' -Monitor 'RunFlutterUsageDelaysMonitor' -ActionTime 150 -OnTimeAction 'RestartFlutterApps' -WorkloadDurationTicks 100 -PauseDurationSeconds 1800 
 }
 
 ### React Native
 
 $outputReactMultipleApps = "react_multiple_apps_test"
 $packagesReactMultipleApps = "com.shinetext.shine", "com.pinterest", "com.cleevio.spendee", "com.myntra.android"#, "com.edutapps.maphi"
-function RunReactMultipleAppsCleaners { RunCleaners -Packages $packagesReactMultipleApps }
-function RunReactMultipleAppsWorkloadGenerators { RunWorkloadGenerators -Packages $packagesReactMultipleApps }
-function RunReactMultipleAppsMonitors { RunMonitors -Output $outputReactMultipleApps -Packages $packagesReactMultipleApps }
-function RunReactMultipleAppsTest
-{
-    InitOutputDirs -Output $outputReactMultipleApps -Packages $packagesReactMultipleApps
-    RestartPackages -Packages $packagesReactMultipleApps
-    RunStressTest -IntervalsCount 600 -Cleaner 'RunReactMultipleAppsCleaners' -WorkloadGenerator 'RunReactMultipleAppsWorkloadGenerators' -Monitor 'RunReactMultipleAppsMonitors'
-}
 
 ### Entry point
 
@@ -101,9 +88,7 @@ Write-Host "Run test:
     - native   multiple apps  (1)
     - native   usage delay    (11)
     - flutter  multiple apps  (2)
-    - flutter  usage delay    (22)
-    - react    multiple apps  (3)
-    - react    usage delay    (33)"
+    - flutter  usage delay    (22)"
 $run_code = Read-Host -Prompt 'Input run code:'
 
 switch ($run_code) {
@@ -111,6 +96,5 @@ switch ($run_code) {
     11 { RunNativeUsageDelaysTest; Break }
     2 { RunFlutterMultipleAppsTest; Break }
     22 { RunFlutterUsageDelaysTest; Break }
-    3 { RunReactMultipleAppsTest; Break }
     Default { Write-Host "Ooops! :)" }
 }
