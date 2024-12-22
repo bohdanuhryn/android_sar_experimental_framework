@@ -1,5 +1,13 @@
 #!/bin/bash
 
+source "$(dirname "$0")/logger.sh"
+
+log_runner() {
+    info_log "runner" "$1"
+}
+
+# Function to run the stress test.
+#
 # Parameters:
 # -i | --iterations: Number of iterations to run
 # -c | --cleaner: Command to clean up before starting the test
@@ -10,13 +18,8 @@
 # -a | --on-time-action: Command to execute at specified intervals
 # -t | --action-time: Interval to execute the on-time action
 #
-
 # Example usage:
 # runner -i 10 -c "echo 'Cleaning up...'" -w "echo 'Generating workload...'" -m "echo 'Monitoring...'" -d 3 -p 5 -a "echo 'On-time action...'" -t 2
-
-info_log() {
-    echo "[INFO] runner ($(date)): $1"
-}
 
 runner() {
     local iterations_count=0
@@ -70,24 +73,24 @@ runner() {
         esac
     done
 
-    info_log "Starting the test with $iterations_count iterations"
+    log_runner "Starting the test with $iterations_count iterations"
 
     # Execute the cleaner command
     if [[ -n $cleaner_function ]]; then
-        info_log "Cleaning up..."
+        log_runner "Cleaning up..."
         eval "$cleaner_function"
     fi
 
     # Execute the workload command
     i=0
     while [[ $i -lt $iterations_count ]]; do
-        info_log "Interval $i"
+        log_runner "Interval $i"
 
         # Execute OnTimeAction at specified intervals
         if [[ $i -gt 0 && $action_time -gt 0 && -n $on_time_action ]]; then
             local j=$((i % action_time))
             if [[ $j -eq 0 ]]; then
-                info_log "On-time action"
+                log_runner "On-time action"
                 eval "$on_time_action"
             fi
         fi
@@ -95,27 +98,27 @@ runner() {
         # Handle workload duration and pauses
         if [[ $i -gt 0 && $workload_duration_ticks -gt 0 && $pause_duration_seconds -gt 0 ]]; then
             if ((i % workload_duration_ticks == 0)); then
-                info_log "Pause begin for $pause_duration_seconds seconds"
+                log_runner "Pause begin for $pause_duration_seconds seconds"
                 local sec=0
                 while ((sec < pause_duration_seconds)); do
-                    info_log "Pause sec = $sec"
+                    log_runner "Pause sec = $sec"
                     sleep 25 # Sleep for 25 seconds
                     eval "$monitor_function"
                     sec=$((sec + 30)) # TODO: Fix pause timing, remove hardcoded 20/30
                 done
             else
-                info_log "Workload begin"
+                log_runner "Workload begin"
                 eval "$workload_function"
-                info_log "Workload end"
+                log_runner "Workload end"
             fi
         else
-            info_log "Workload begin"
+            log_runner "Workload begin"
             eval "$workload_function"
-            info_log "Workload end"
+            log_runner "Workload end"
         fi
 
         # Run the monitor command
-        info_log "Monitoring..."
+        log_runner "Monitoring..."
         eval "$monitor_function"
 
         i=$((i + 1))

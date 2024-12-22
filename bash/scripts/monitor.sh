@@ -1,14 +1,16 @@
 #!/bin/bash
 
-# Function to initialize output directories
+# Function to initialize output directories.
+#
+# Arguments:
+#   $1: Output directory name
 init_output_dirs() {
     local output=$1
 
     mkdir -p "./output/$output/logcat"
     mkdir -p "./output/$output/dumpsys"
     mkdir -p "./output/$output/proctasks"
-    # Uncomment the line below if "bugReports" is needed
-    # mkdir -p "./output/$output/bugReports"
+    mkdir -p "./output/$output/bugReports"
 }
 
 # Function to capture a bug report
