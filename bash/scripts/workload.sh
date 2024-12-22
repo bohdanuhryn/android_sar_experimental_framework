@@ -1,6 +1,17 @@
 #!/bin/bash
 
-# Function to run the Android monkey tool
+# Function to run the Android monkey tool.
+# 
+# Parameters:
+#   $1: packages - The Android packages to run the monkey tool on.
+#   $2: duration_ms - The duration of the monkey tool in milliseconds.
+#   $3: events_count - The number of events to generate.
+#   $4: ignore_errors - Whether to ignore errors or not.
+#   $5: enable_events - Whether to enable events or not.
+#   $6: enable_switches - Whether to enable switches or not.
+#
+# Example usage:
+# run_monkey "package1 package2" 1000 50 true true true
 run_monkey() {
     local packages=($1)
     local duration_ms=${2:-0}
