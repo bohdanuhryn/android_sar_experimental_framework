@@ -1,37 +1,50 @@
 #!/bin/bash
 
+source "$(dirname "$0")/logger.sh"
+
+log_monitor() {
+    info_log "monitor" "$1"
+}
+
+OUTPUT_DIR_NAME="default"
+OUTPUT_DIR_TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+OUTPUT_DIR_PATH="./output/$OUTPUT_DIR_NAME/$OUTPUT_DIR_TIMESTAMP"
+
 # Function to initialize output directories.
 #
 # Arguments:
 #   $1: Output directory name
 init_output_dirs() {
-    local output=$1
+    OUTPUT_DIR_NAME=$1
+    OUTPUT_DIR_TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+    OUTPUT_DIR_PATH="./output/$OUTPUT_DIR_NAME/$OUTPUT_DIR_TIMESTAMP"
 
-    mkdir -p "./output/$output/logcat"
-    mkdir -p "./output/$output/dumpsys"
-    mkdir -p "./output/$output/proctasks"
-    mkdir -p "./output/$output/bugReports"
+    mkdir -p "$OUTPUT_DIR_PATH/logcat"
+    mkdir -p "$OUTPUT_DIR_PATH/dumpsys"
+    mkdir -p "$OUTPUT_DIR_PATH/proctasks"
+    mkdir -p "$OUTPUT_DIR_PATH/bugReports"
+
+    log_monitor "Output directories initialized in $OUTPUT_DIR_PATH"
 }
 
 # Function to capture a bug report
 bug_reports_monitor() {
-    local output=$1
-    local path="./output/$output/bugReports"
+    local path="$OUTPUT_DIR_PATH/bugReports"
 
-    echo "Running bug report..."
+    log_monitor "Running bug report..."
     mkdir -p "$path"
     adb bugreport "$path"
+    log_monitor "Bug report saved to $path"
 }
 
 # Function to monitor dumpsys service
 dumpsys_service_monitor() {
-    local output=$1
-    local service=$2
-    shift 2
+    local service=$1
+    shift 1
     local packages=("$@") # Remaining arguments are packages
-    local path="./output/$output/dumpsys"
+    local path="$OUTPUT_DIR_PATH/dumpsys"
 
-    echo "Monitoring dumpsys service: $service"
+    log_monitor "Monitoring dumpsys service: $service"
     mkdir -p "$path"
 
     if [[ ${#packages[@]} -gt 0 ]]; then
@@ -47,37 +60,31 @@ dumpsys_service_monitor() {
         echo "$(date)" >> "$full_path"
         adb shell dumpsys "$service" >> "$full_path"
     fi
+    log_monitor "Dumpsys service $service saved to $path"
 }
 
 # Function to capture LogCat
 logcat_monitor() {
-    local output=$1
-    local path="./output/$output/logcat/logcat.txt"
+    local path="$OUTPUT_DIR_PATH/logcat/logcat.txt"
 
-    echo "Capturing LogCat..."
+    log_monitor "Capturing LogCat..."
     echo "$(date)" >> "$path"
     adb logcat -d -v monotonic >> "$path"
     adb logcat -c
+    log_monitor "LogCat saved to $path"
 }
 
 # Function to monitor /proc tasks
 proc_tasks_monitor() {
-    local output=$1
-    local path="./output/$output/proctasks/proctasks.txt"
+    local path="$OUTPUT_DIR_PATH/proctasks/proctasks.txt"
 
-    echo "Monitoring /proc tasks..."
+    log_monitor "Monitoring /proc tasks..."
     echo "$(date)" >> "$path"
     local dirs=$(adb shell ls /proc/ | grep '^[0-9]*$')
 
     for dir in $dirs; do
         adb shell cat "/proc/$dir/stat" >> "$path"
     done
-}
 
-# Example usage
-# Uncomment the following lines and adjust the parameters as needed
-# init_output_dirs "test_output"
-# bug_reports_monitor "test_output"
-# dumpsys_service_monitor "test_output" "battery" "com.example.app1" "com.example.app2"
-# logcat_monitor "test_output"
-# proc_tasks_monitor "test_output"
+    log_monitor "/proc tasks saved to $path"
+}

@@ -3,23 +3,55 @@
 # Function to run the Android monkey tool.
 #
 # Parameters:
-#   $1: packages - The Android packages to run the monkey tool on.
-#   $2: duration_ms - The duration of the monkey tool in milliseconds.
-#   $3: events_count - The number of events to generate.
-#   $4: ignore_errors - Whether to ignore errors or not.
-#   $5: enable_events - Whether to enable events or not.
-#   $6: enable_switches - Whether to enable switches or not.
+# -p | --packages: List of packages to run the monkey on
+# -d | --duration: Duration of the monkey execution in milliseconds
+# -e | --events: Number of events to generate
+# -i | --ignore-errors: Ignore errors during monkey execution
+# -ee | --enable-events: Enable events in the monkey execution
+# -es | --enable-switches: Enable app switches in the monkey execution
 #
 # Example usage:
 # run_monkey "package1 package2" 1000 50 true true true
 
 run_monkey() {
-    local packages=($1)
-    local duration_ms=${2:-0}
-    local events_count=${3:-100}
-    local ignore_errors=${4:-true}
-    local enable_events=${5:-true}
-    local enable_switches=${6:-true}
+    local packages=()
+    local duration_ms=0
+    local events_count=0
+    local ignore_errors=true
+    local enable_events=true
+    local enable_switches=true
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+        -p | --packages)
+            packages+=($2)
+            shift 2
+            ;;
+        -d | --duration)
+            duration_ms=$2
+            shift 2
+            ;;
+        -e | --events)
+            events_count=$2
+            shift 2
+            ;;
+        -i | --ignore-errors)
+            ignore_errors=$2
+            shift 2
+            ;;
+        -ee | --enable-events)
+            enable_events=$2
+            shift 2
+            ;;
+        -es | --enable-switches)
+            enable_switches=$2
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+        esac
+    done
 
     local events_delay_ms=$((duration_ms / events_count))
 
