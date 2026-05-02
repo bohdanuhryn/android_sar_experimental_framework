@@ -9,7 +9,7 @@ Scripts live in `scripts/bash/`. Experiment entry points in `experiments/*.sh` s
 - All functions accept named parameters (`-x | --long-name value`) unless they take a single obvious positional arg.
 - ADB device targeting is controlled by a single exported variable `ADB_SERIAL`. When set, every `adb` invocation in every script uses `adb -s "$ADB_SERIAL"`. When unset, `adb` uses the only connected device (or errors if multiple are connected).
 - Functions write nothing to stdout except via `log_*` helpers. Data written to files uses `>>` (append), never `>`.
-- Every function returns a non-zero exit code on error and logs the reason via `error_log`.
+- Every function returns a non-zero exit code on error and logs the reason via `log_error`.
 
 ---
 
@@ -17,34 +17,38 @@ Scripts live in `scripts/bash/`. Experiment entry points in `experiments/*.sh` s
 
 Provides logging helpers used by all other scripts.
 
-### Current state
-Two functions: `logger` (raw) and `info_log` (wrapper). Output goes to stdout only.
-
-### Required functions
+### Functions
 
 #### `logger(level, context, message)`
+
 Formats and prints one log line.
+
 - Output format: `[LEVEL] context (ISO-8601 timestamp): message`
 - Writes to stdout.
-- If `LOG_FILE` variable is set, also appends to that file path.
+- If `LOG_FILE` is set, also appends to that path.
 
-#### `info_log(context, message)`
-Calls `logger "INFO" ...`.
+#### `log_info(context, message)`
 
-#### `warn_log(context, message)`  
-Calls `logger "WARN" ...`. Writes to stderr as well as stdout/file.
+Logs an informational message.
 
-#### `error_log(context, message)`  
-Calls `logger "ERROR" ...`. Writes to stderr as well as stdout/file.
+#### `log_warn(context, message)`
 
-#### `debug_log(context, message)` *(new)*
-Calls `logger "DEBUG" ...`. Only emits output when `DEBUG=1` is set in the environment.
+Logs a warning. Writes to stdout, stderr, and `LOG_FILE` (if set).
+
+#### `log_error(context, message)`
+
+Logs an error. Writes to stdout, stderr, and `LOG_FILE` (if set).
+
+#### `log_debug(context, message)`
+
+Logs a debug message. Only emits output when `DEBUG=1` is set in the environment.
 
 ### Environment variables consumed
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LOG_FILE` | unset | If set, all log output is also appended to this path |
-| `DEBUG` | unset | Set to `1` to enable `debug_log` output |
+
+| Variable   | Default | Description                                          |
+|------------|---------|------------------------------------------------------|
+| `LOG_FILE` | unset   | If set, all log output is also appended to this path |
+| `DEBUG`    | unset   | Set to `1` to enable `log_debug` output              |
 
 ---
 
@@ -438,7 +442,7 @@ No logic beyond defining callbacks and calling `runner`. Error handling and orch
 | File | New functions |
 |------|--------------|
 | `adb.sh` *(new)* | `adb_cmd`, `adb_check_connection`, `adb_list_devices` |
-| `logger.sh` | `warn_log`, `error_log`, `debug_log` |
+| `logger.sh` | `log_warn`, `log_error`, `log_debug` |
 | `workload.sh` | `restart_packages` |
 | `monitor.sh` | `batterystats_monitor`, `list_installed_packages` |
 
