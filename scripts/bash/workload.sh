@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "$(dirname "${BASH_SOURCE[0]}")/adb.sh"
+
 # Function to run the Android monkey tool.
 #
 # Parameters:
@@ -81,19 +83,19 @@ run_monkey() {
 
     echo "[Workload Generator] all params: $packages_params -v -v $throttle_param $events_params $ignore_params $events_count"
 
-    adb shell monkey $packages_params -v -v $throttle_param $events_params $ignore_params $events_count
+    adb_cmd shell monkey $packages_params -v -v $throttle_param $events_params $ignore_params $events_count
 }
 
 run_packages() {
     local packages=($1)
     for package in "${packages[@]}"; do
-        adb shell monkey -p "$package" -c android.intent.category.LAUNCHER 1
+        adb_cmd shell monkey -p "$package" -c android.intent.category.LAUNCHER 1
     done
 }
 
 kill_packages() {
     local packages=($1)
     for package in "${packages[@]}"; do
-        adb shell am force-stop "$package"
+        adb_cmd shell am force-stop "$package"
     done
 }

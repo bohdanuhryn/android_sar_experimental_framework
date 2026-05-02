@@ -1,6 +1,7 @@
 #!/bin/bash
 
-source "$(dirname "$0")/logger.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/adb.sh"
 
 log_monitor() {
     log_info "monitor" "$1"
@@ -33,7 +34,7 @@ bug_reports_monitor() {
 
     log_monitor "Running bug report..."
     mkdir -p "$path"
-    adb bugreport "$path"
+    adb_cmd bugreport "$path"
     log_monitor "Bug report saved to $path"
 }
 
@@ -52,13 +53,13 @@ dumpsys_service_monitor() {
             local filename="$service-$package.txt"
             local full_path="$path/$filename"
             echo "$(date)" >> "$full_path"
-            adb shell dumpsys "$service" "$package" >> "$full_path"
+            adb_cmd shell dumpsys "$service" "$package" >> "$full_path"
         done
     else
         local filename="$service.txt"
         local full_path="$path/$filename"
         echo "$(date)" >> "$full_path"
-        adb shell dumpsys "$service" >> "$full_path"
+        adb_cmd shell dumpsys "$service" >> "$full_path"
     fi
     log_monitor "Dumpsys service $service saved to $path"
 }
@@ -69,8 +70,8 @@ logcat_monitor() {
 
     log_monitor "Capturing LogCat..."
     echo "$(date)" >> "$path"
-    adb logcat -d -v monotonic >> "$path"
-    adb logcat -c
+    adb_cmd logcat -d -v monotonic >> "$path"
+    adb_cmd logcat -c
     log_monitor "LogCat saved to $path"
 }
 
@@ -80,10 +81,10 @@ proc_tasks_monitor() {
 
     log_monitor "Monitoring /proc tasks..."
     echo "$(date)" >> "$path"
-    local dirs=$(adb shell ls /proc/ | grep '^[0-9]*$')
+    local dirs=$(adb_cmd shell ls /proc/ | grep '^[0-9]*$')
 
     for dir in $dirs; do
-        adb shell cat "/proc/$dir/stat" >> "$path"
+        adb_cmd shell cat "/proc/$dir/stat" >> "$path"
     done
 
     log_monitor "/proc tasks saved to $path"

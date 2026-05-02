@@ -1,6 +1,7 @@
 #!/bin/bash
 
-source "$(dirname "$0")/logger.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/adb.sh"
 
 log_runner() {
     log_info "runner" "$1"
@@ -30,6 +31,7 @@ runner() {
     local pause_duration_seconds=0
     local on_time_action_function=""
     local action_time=0
+    local serial=""
 
     # Parse the command-line arguments
     while [[ $# -gt 0 ]]; do
@@ -66,12 +68,22 @@ runner() {
             action_time=$2
             shift 2
             ;;
+        -s | --serial)
+            serial=$2
+            shift 2
+            ;;
         *)
             echo "Unknown parameter: $1" >&2
             exit 1
             ;;
         esac
     done
+
+    if [[ -n "$serial" ]]; then
+        export ADB_SERIAL="$serial"
+    fi
+
+    adb_check_connection || return 1
 
     log_runner "Starting the test with $iterations_count iterations"
 
