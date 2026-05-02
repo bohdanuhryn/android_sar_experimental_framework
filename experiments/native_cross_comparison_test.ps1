@@ -1,8 +1,8 @@
 Set-Alias -Name adb -Value c:\Users\Bohdan\AppData\Local\Android\Sdk\platform-tools\adb
 
-. Current-Location\..\scripts\stress.ps1
-. Current-Location\..\scripts\workload.ps1
-. Current-Location\..\scripts\monitor.ps1
+. "$PSScriptRoot\..\scripts\powershell\stress.ps1"
+. "$PSScriptRoot\..\scripts\powershell\workload.ps1"
+. "$PSScriptRoot\..\scripts\powershell\monitor.ps1"
 
 function RunCleaners {
     param ([String[]] $Packages)

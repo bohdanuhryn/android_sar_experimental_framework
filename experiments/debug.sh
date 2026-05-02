@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Include external scripts
-source "$(dirname "$0")/../scripts/logger.sh"
-source "$(dirname "$0")/../scripts/runner.sh"
-source "$(dirname "$0")/../scripts/workload.sh"
-source "$(dirname "$0")/../scripts/monitor.sh"
+source "$(dirname "$0")/../scripts/bash/logger.sh"
+source "$(dirname "$0")/../scripts/bash/runner.sh"
+source "$(dirname "$0")/../scripts/bash/workload.sh"
+source "$(dirname "$0")/../scripts/bash/monitor.sh"
 
 # Variables
 packages=("com.google.android.calendar" "com.android.contacts")
