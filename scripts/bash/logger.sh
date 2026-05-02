@@ -2,7 +2,7 @@ logger() {
     local level=$1
     local function=$2
     local message=$3
-    echo "[$level] $function ($(date)): $message"
+    echo "[$level] $function ($(date +"%Y-%m-%dT%H:%M:%S")): $message"
 }
 
 info_log() {
