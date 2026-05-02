@@ -3,7 +3,7 @@
 source "$(dirname "$0")/logger.sh"
 
 log_monitor() {
-    info_log "monitor" "$1"
+    log_info "monitor" "$1"
 }
 
 OUTPUT_DIR_NAME="default"

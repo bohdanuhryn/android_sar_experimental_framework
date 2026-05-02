@@ -3,7 +3,7 @@
 source "$(dirname "$0")/logger.sh"
 
 log_runner() {
-    info_log "runner" "$1"
+    log_info "runner" "$1"
 }
 
 # Function to run the stress test.
