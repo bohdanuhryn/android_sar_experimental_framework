@@ -87,7 +87,7 @@ run_monkey() {
         ;;
     esac
 
-    echo "[Workload Generator] all params: $packages_params -v -v $throttle_param $events_params $ignore_params $events_count"
+    log_info "run_monkey" "monkey $packages_params-v -v $throttle_param $events_params $ignore_params $events_count"
 
     adb_cmd shell monkey $packages_params -v -v $throttle_param $events_params $ignore_params $events_count
 }
