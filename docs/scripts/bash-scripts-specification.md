@@ -116,21 +116,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/adb.sh"
 
 ## 4. `workload.sh`
 
-Provides functions for generating workload on the target Android device.
+Provides functions for generating workload on the target Android device. Sources `adb.sh` (and transitively `logger.sh`) — no additional sourcing needed by callers.
 
-### Current state
-
-Three functions: `run_monkey`, `run_packages`, `kill_packages`.
-
-### Bug fixes required
-
-| Bug                                                    | Current                                                               | Fix                                                                                         |
-|--------------------------------------------------------|-----------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
-| Double `-p` flag                                       | `packages_params="-p "$(printf " -p %s" ...)` → `-p  -p pkg1 -p pkg2` | Build array; join with `-p`: `$(printf -- '-p %s ' "${packages[@]}")`                       |
-| `run_packages` / `kill_packages` take string, re-split | `local packages=($1)`                                                 | Accept `"$@"` to receive array elements as separate arguments, consistent with `run_monkey` |
-| Division by zero when `events_count=0`                 | `events_delay_ms=$((duration_ms / events_count))`                     | Guard: if `events_count` is 0, skip throttle entirely                                       |
-
-### Required functions
+### Workload functions
 
 #### `run_monkey`
 
@@ -140,28 +128,27 @@ Launches Android Monkey on the target device.
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `-p` / `--package` | string (repeatable) | — | Package name to target. Pass once per package |
-| `-d` / `--duration` | integer (ms) | `0` | Total Monkey run duration in milliseconds. Used to derive `--throttle` |
-| `-e` / `--events` | integer | `100` | Total number of events. Combined with duration to compute inter-event delay |
-| `-i` / `--ignore-errors` | bool | `true` | Add `--ignore-crashes --ignore-timeouts --ignore-security-exceptions --kill-process-after-error` |
+| `-p` / `--packages` | string (repeatable) | — | Package name to target. Pass once per package |
+| `-d` / `--duration` | integer (ms) | `0` | Total run duration. Combined with `--events` to compute `--throttle`. Omitted when `0` |
+| `-e` / `--events` | integer | `0` | Total number of events. Combined with duration to compute inter-event delay |
+| `-i` / `--ignore-errors` | bool | `true` | Adds `--ignore-crashes --ignore-timeouts --ignore-security-exceptions --kill-process-after-error` |
 | `--event-preset` | string | `mixed` | Named event distribution preset (see below) |
 
-**Event distribution presets** (replaces `--enable-events` / `--enable-switches` flags):
+**Event distribution presets:**
 
-| Preset name | Description | Distribution |
-|-------------|-------------|-------------|
-| `mixed` | Touch, motion, navigation, minor app switches | touch 20, motion 20, trackball 15, nav 20, majornav 15, syskeys 0, appswitch 6, flip 2, pinchzoom 2 |
-| `gestures` | Touch and motion heavy, no switches | touch 20, motion 15, trackball 15, nav 20, majornav 15, syskeys 5, anyevent 5, flip 2, pinchzoom 3 |
+| Preset | Description | Distribution |
+|--------|-------------|--------------|
+| `mixed` | Touch, motion, navigation, minor app switches | touch 20, motion 20, trackball 15, nav 20, majornav 15, syskeys 0, appswitch 6, anyevent 0, flip 2, pinchzoom 2 |
+| `gestures` | Touch and motion heavy, no app switches | touch 20, motion 15, trackball 15, nav 20, majornav 15, syskeys 5, anyevent 5, flip 2, pinchzoom 3 |
 | `switches` | App switching only | appswitch 100, all others 0 |
 
-The preset replaces the current boolean `--enable-events` / `--enable-switches` combination. New presets can be added without changing the function interface.
+An unknown preset name logs an error via `log_error` and returns `1`. New presets can be added to the `case` block without changing the function interface.
 
 **Behavior:**
-1. If `duration > 0` and `events > 0`, compute `--throttle = duration / events`.
-2. Build `-p pkg` list.
-3. Log the full constructed Monkey command before executing.
-4. Call `adb_cmd shell monkey ...`.
-5. Return Monkey's exit code.
+1. If both `duration > 0` and `events > 0`, compute `--throttle = duration / events`. Otherwise `--throttle` is omitted.
+2. Build `-p pkg1 -p pkg2 ...` list via `printf -- '-p %s '`.
+3. Log the full constructed Monkey command via `log_info`.
+4. Call `adb_cmd shell monkey ...` and return its exit code.
 
 ---
 
@@ -172,8 +159,8 @@ Launches the default launcher activity of each package.
 **Parameters:** `"$@"` — package names as separate arguments.
 
 **Behavior:**
-- For each package: `adb_cmd shell monkey -p "$pkg" -c android.intent.category.LAUNCHER 1`
-- Log each launch attempt.
+- Logs each launch attempt via `log_info`.
+- For each package: `adb_cmd shell monkey -p "$package" -c android.intent.category.LAUNCHER 1`.
 
 ---
 
@@ -184,16 +171,8 @@ Force-stops each package.
 **Parameters:** `"$@"` — package names as separate arguments.
 
 **Behavior:**
-- For each package: `adb_cmd shell am force-stop "$pkg"`
-- Log each stop attempt.
-
----
-
-#### `restart_packages` *(new)*
-
-Convenience wrapper: calls `kill_packages "$@"` then `run_packages "$@"`.
-
-Used in aging experiments that include forced restarts as the on-time action.
+- Logs each stop attempt via `log_info`.
+- For each package: `adb_cmd shell am force-stop "$package"`.
 
 ---
 

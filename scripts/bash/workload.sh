@@ -2,19 +2,6 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/adb.sh"
 
-# Function to run the Android monkey tool.
-#
-# Parameters:
-# -p | --packages: List of packages to run the monkey on
-# -d | --duration: Duration of the monkey execution in milliseconds
-# -e | --events: Number of events to generate
-# -i | --ignore-errors: Ignore errors during monkey execution
-# -ee | --enable-events: Enable events in the monkey execution
-# -es | --enable-switches: Enable app switches in the monkey execution
-#
-# Example usage:
-# run_monkey "package1 package2" 1000 50 true true true
-
 run_monkey() {
     local packages=()
     local duration_ms=0
