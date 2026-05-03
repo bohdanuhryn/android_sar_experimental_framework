@@ -55,7 +55,10 @@ run_monkey() {
         esac
     done
 
-    local events_delay_ms=$((duration_ms / events_count))
+    local events_delay_ms=0
+    if [[ $duration_ms -gt 0 && $events_count -gt 0 ]]; then
+        events_delay_ms=$((duration_ms / events_count))
+    fi
 
     local packages_params=""
     if [ ${#packages[@]} -gt 0 ]; then
