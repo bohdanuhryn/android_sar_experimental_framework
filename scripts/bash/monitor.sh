@@ -40,26 +40,49 @@ bug_reports_monitor() {
 
 # Function to monitor dumpsys service
 dumpsys_service_monitor() {
-    local service=$1
-    shift 1
-    local packages=("$@") # Remaining arguments are packages
+    local service=""
+    local packages=()
+    local options=""
     local path="$OUTPUT_DIR_PATH/dumpsys"
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+        -s | --service)
+            service=$2
+            shift 2
+            ;;
+        -p | --package)
+            packages+=("$2")
+            shift 2
+            ;;
+        -o | --options)
+            options=$2
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+        esac
+    done
+
+    if [[ -z "$service" ]]; then
+        log_error "dumpsys_service_monitor" "Service name is required (-s | --service)"
+        return 1
+    fi
 
     log_monitor "Monitoring dumpsys service: $service"
     mkdir -p "$path"
 
     if [[ ${#packages[@]} -gt 0 ]]; then
         for package in "${packages[@]}"; do
-            local filename="$service-$package.txt"
-            local full_path="$path/$filename"
+            local full_path="$path/$service-$package.txt"
             echo "$(date)" >> "$full_path"
-            adb_cmd shell dumpsys "$service" "$package" >> "$full_path"
+            adb_cmd shell dumpsys "$service" "$package" $options >> "$full_path"
         done
     else
-        local filename="$service.txt"
-        local full_path="$path/$filename"
+        local full_path="$path/$service.txt"
         echo "$(date)" >> "$full_path"
-        adb_cmd shell dumpsys "$service" >> "$full_path"
+        adb_cmd shell dumpsys "$service" $options >> "$full_path"
     fi
     log_monitor "Dumpsys service $service saved to $path"
 }
