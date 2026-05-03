@@ -93,15 +93,15 @@ run_monkey() {
 }
 
 run_packages() {
-    local packages=($1)
-    for package in "${packages[@]}"; do
+    for package in "$@"; do
+        log_info "run_packages" "Launching $package"
         adb_cmd shell monkey -p "$package" -c android.intent.category.LAUNCHER 1
     done
 }
 
 kill_packages() {
-    local packages=($1)
-    for package in "${packages[@]}"; do
+    for package in "$@"; do
+        log_info "kill_packages" "Stopping $package"
         adb_cmd shell am force-stop "$package"
     done
 }
