@@ -52,46 +52,65 @@ Logs a debug message. Only emits output when `DEBUG=1` is set in the environment
 
 ---
 
-## 2. `adb.sh` *(new file)*
+## 2. `adb.sh`
 
-Centralizes ADB device management. All other scripts source this file instead of calling `adb` directly for device-sensitive operations.
+Centralizes ADB device management. All other scripts source this file instead of calling `adb` directly for device-sensitive operations. Guards against double-sourcing via `_ADB_SH_LOADED`.
 
-### Rationale
-Currently every script calls `adb` with no device selector. Adding `-s` to every individual call in three other scripts is error-prone and hard to maintain. A thin wrapper isolates this concern.
+Sources `logger.sh` internally — callers do not need to source `logger.sh` separately before `adb.sh`.
 
-### Required functions
+### Public functions
 
 #### `adb_cmd(...args)`
-Wrapper around `adb`. Injects `-s "$ADB_SERIAL"` when `ADB_SERIAL` is set.
+
+Transparent wrapper around `adb`. When `ADB_SERIAL` is set, injects `-s "$ADB_SERIAL"` before all other arguments. When unset, calls `adb` as-is.
+
 ```bash
-adb_cmd shell dumpsys meminfo   # becomes: adb -s <serial> shell dumpsys meminfo
+adb_cmd shell dumpsys meminfo   # → adb -s <serial> shell dumpsys meminfo
+adb_cmd logcat -d               # → adb -s <serial> logcat -d
 ```
-All other scripts call `adb_cmd` instead of `adb` directly.
+
+Returns the exit code of the underlying `adb` call. All other scripts call `adb_cmd` instead of `adb` directly.
 
 #### `adb_check_connection()`
-Validates that a usable device is available before an experiment starts.
-- If `ADB_SERIAL` is set: verifies that exact serial appears in `adb devices` with state `device`.
-- If `ADB_SERIAL` is unset: verifies exactly one device is connected. If zero or more than one, prints a clear error and returns 1.
-- Returns 0 on success, 1 on failure.
+
+Validates that a usable device is available. Intended to be called once at the start of an experiment (called by `runner` automatically when using `runner.sh`).
+
+- If `ADB_SERIAL` is set: checks that the exact serial appears in `adb devices` with state `device`. Logs an error and returns `1` if not found or not in `device` state.
+- If `ADB_SERIAL` is unset: counts lines in `adb devices` with state `device`. Returns `1` with a descriptive error if the count is zero ("no device connected") or greater than one ("multiple devices — set ADB_SERIAL").
+- Logs an info message and returns `0` on success.
 
 #### `adb_list_devices()`
-Prints connected device serials, one per line, excluding the header. Used by experiment scripts and the GUI app to populate device selection.
 
-### Environment variables consumed
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ADB_SERIAL` | unset | Target device serial. Set by experiment script or the GUI app before sourcing other scripts |
+Prints the serial of every connected device that is in `device` state, one per line. Excludes `offline` and `unauthorized` entries, and strips the state suffix — serials only.
+
+Used by experiment scripts and the GUI app to populate device selection.
+
+```bash
+$ adb_list_devices
+emulator-5554
+R3CN90FDEAJ
+```
+
+### Environment variables
+
+| Variable     | Default | Description                                                                                                                                                                      |
+|--------------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ADB_SERIAL` | unset   | Target device serial. When set, every `adb_cmd` call targets this device via `-s`. Set by the experiment script, `runner --serial`, or `emulator_set_serial` before any ADB call |
 
 ---
 
 ## 3. `logger.sh` + `adb.sh` sourcing order
 
-Every script that uses ADB should source in this order:
+Every script that uses ADB sources in this order:
+
 ```bash
-source "$(dirname "$0")/logger.sh"
-source "$(dirname "$0")/adb.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/adb.sh"
 ```
-`runner.sh`, `monitor.sh`, and `workload.sh` all source `logger.sh` directly today; after `adb.sh` is added, they source both.
+
+`BASH_SOURCE[0]` is used instead of `$0` so that the path resolves to the script's own directory regardless of which entry-point script sourced it.
+
+`runner.sh`, `monitor.sh`, and `workload.sh` all source both files.
 
 ---
 
@@ -100,15 +119,16 @@ source "$(dirname "$0")/adb.sh"
 Provides functions for generating workload on the target Android device.
 
 ### Current state
+
 Three functions: `run_monkey`, `run_packages`, `kill_packages`.
 
 ### Bug fixes required
 
-| Bug | Current | Fix |
-|-----|---------|-----|
-| Double `-p` flag | `packages_params="-p "$(printf " -p %s" ...)` → `-p  -p pkg1 -p pkg2` | Build array; join with `-p`: `$(printf -- '-p %s ' "${packages[@]}")` |
-| `run_packages` / `kill_packages` take string, re-split | `local packages=($1)` | Accept `"$@"` to receive array elements as separate arguments, consistent with `run_monkey` |
-| Division by zero when `events_count=0` | `events_delay_ms=$((duration_ms / events_count))` | Guard: if `events_count` is 0, skip throttle entirely |
+| Bug                                                    | Current                                                               | Fix                                                                                         |
+|--------------------------------------------------------|-----------------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| Double `-p` flag                                       | `packages_params="-p "$(printf " -p %s" ...)` → `-p  -p pkg1 -p pkg2` | Build array; join with `-p`: `$(printf -- '-p %s ' "${packages[@]}")`                       |
+| `run_packages` / `kill_packages` take string, re-split | `local packages=($1)`                                                 | Accept `"$@"` to receive array elements as separate arguments, consistent with `run_monkey` |
+| Division by zero when `events_count=0`                 | `events_delay_ms=$((duration_ms / events_count))`                     | Guard: if `events_count` is 0, skip throttle entirely                                       |
 
 ### Required functions
 
