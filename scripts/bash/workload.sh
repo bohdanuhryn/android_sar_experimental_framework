@@ -20,8 +20,7 @@ run_monkey() {
     local duration_ms=0
     local events_count=0
     local ignore_errors=true
-    local enable_events=true
-    local enable_switches=true
+    local event_preset="mixed"
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -41,12 +40,8 @@ run_monkey() {
             ignore_errors=$2
             shift 2
             ;;
-        -ee | --enable-events)
-            enable_events=$2
-            shift 2
-            ;;
-        -es | --enable-switches)
-            enable_switches=$2
+        --event-preset)
+            event_preset=$2
             shift 2
             ;;
         *)
@@ -76,13 +71,21 @@ run_monkey() {
     fi
 
     local events_params=""
-    if [ "$enable_events" == "true" ] && [ "$enable_switches" == "true" ]; then
+    case "$event_preset" in
+    mixed)
         events_params="--pct-touch 20 --pct-motion 20 --pct-trackball 15 --pct-nav 20 --pct-majornav 15 --pct-syskeys 0 --pct-appswitch 6 --pct-anyevent 0 --pct-flip 2 --pct-pinchzoom 2"
-    elif [ "$enable_events" == "true" ]; then
+        ;;
+    gestures)
         events_params="--pct-touch 20 --pct-motion 15 --pct-trackball 15 --pct-nav 20 --pct-majornav 15 --pct-syskeys 5 --pct-anyevent 5 --pct-flip 2 --pct-pinchzoom 3"
-    elif [ "$enable_switches" == "true" ]; then
+        ;;
+    switches)
         events_params="--pct-touch 0 --pct-motion 0 --pct-trackball 0 --pct-nav 0 --pct-majornav 0 --pct-syskeys 0 --pct-appswitch 100 --pct-anyevent 0 --pct-flip 0 --pct-pinchzoom 0"
-    fi
+        ;;
+    *)
+        log_error "run_monkey" "Unknown event preset: '$event_preset'. Valid values: mixed, gestures, switches"
+        return 1
+        ;;
+    esac
 
     echo "[Workload Generator] all params: $packages_params -v -v $throttle_param $events_params $ignore_params $events_count"
 
