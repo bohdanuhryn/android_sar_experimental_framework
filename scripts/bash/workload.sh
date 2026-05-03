@@ -26,7 +26,7 @@ run_monkey() {
     while [[ $# -gt 0 ]]; do
         case $1 in
         -p | --packages)
-            packages+=($2)
+            packages+=("$2")
             shift 2
             ;;
         -d | --duration)
