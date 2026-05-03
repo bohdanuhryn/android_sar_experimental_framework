@@ -1,9 +1,14 @@
 #!/bin/bash
 
-source "$(dirname "$0")/logger.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/adb.sh"
 
 log_monitor() {
-    info_log "monitor" "$1"
+    log_info "monitor" "$1"
+}
+
+_monitor_separator() {
+    echo "=== Recording $(date +"%Y-%m-%d %H:%M:%S") ==="
 }
 
 OUTPUT_DIR_NAME="default"
@@ -33,32 +38,55 @@ bug_reports_monitor() {
 
     log_monitor "Running bug report..."
     mkdir -p "$path"
-    adb bugreport "$path"
+    adb_cmd bugreport "$path"
     log_monitor "Bug report saved to $path"
 }
 
 # Function to monitor dumpsys service
 dumpsys_service_monitor() {
-    local service=$1
-    shift 1
-    local packages=("$@") # Remaining arguments are packages
+    local service=""
+    local packages=()
+    local options=""
     local path="$OUTPUT_DIR_PATH/dumpsys"
+
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+        -s | --service)
+            service=$2
+            shift 2
+            ;;
+        -p | --package)
+            packages+=("$2")
+            shift 2
+            ;;
+        -o | --options)
+            options=$2
+            shift 2
+            ;;
+        *)
+            shift
+            ;;
+        esac
+    done
+
+    if [[ -z "$service" ]]; then
+        log_error "dumpsys_service_monitor" "Service name is required (-s | --service)"
+        return 1
+    fi
 
     log_monitor "Monitoring dumpsys service: $service"
     mkdir -p "$path"
 
     if [[ ${#packages[@]} -gt 0 ]]; then
         for package in "${packages[@]}"; do
-            local filename="$service-$package.txt"
-            local full_path="$path/$filename"
-            echo "$(date)" >> "$full_path"
-            adb shell dumpsys "$service" "$package" >> "$full_path"
+            local full_path="$path/$service-$package.txt"
+            _monitor_separator >> "$full_path"
+            adb_cmd shell dumpsys "$service" "$package" $options >> "$full_path"
         done
     else
-        local filename="$service.txt"
-        local full_path="$path/$filename"
-        echo "$(date)" >> "$full_path"
-        adb shell dumpsys "$service" >> "$full_path"
+        local full_path="$path/$service.txt"
+        _monitor_separator >> "$full_path"
+        adb_cmd shell dumpsys "$service" $options >> "$full_path"
     fi
     log_monitor "Dumpsys service $service saved to $path"
 }
@@ -68,9 +96,8 @@ logcat_monitor() {
     local path="$OUTPUT_DIR_PATH/logcat/logcat.txt"
 
     log_monitor "Capturing LogCat..."
-    echo "$(date)" >> "$path"
-    adb logcat -d -v monotonic >> "$path"
-    adb logcat -c
+    _monitor_separator >> "$path"
+    adb_cmd logcat -d -v monotonic >> "$path" && adb_cmd logcat -c
     log_monitor "LogCat saved to $path"
 }
 
@@ -79,11 +106,11 @@ proc_tasks_monitor() {
     local path="$OUTPUT_DIR_PATH/proctasks/proctasks.txt"
 
     log_monitor "Monitoring /proc tasks..."
-    echo "$(date)" >> "$path"
-    local dirs=$(adb shell ls /proc/ | grep '^[0-9]*$')
+    _monitor_separator >> "$path"
+    local dirs=$(adb_cmd shell ls /proc/ | grep '^[0-9]*$')
 
     for dir in $dirs; do
-        adb shell cat "/proc/$dir/stat" >> "$path"
+        adb_cmd shell cat "/proc/$dir/stat" >> "$path"
     done
 
     log_monitor "/proc tasks saved to $path"

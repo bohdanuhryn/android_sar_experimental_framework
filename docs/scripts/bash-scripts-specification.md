@@ -9,7 +9,7 @@ Scripts live in `scripts/bash/`. Experiment entry points in `experiments/*.sh` s
 - All functions accept named parameters (`-x | --long-name value`) unless they take a single obvious positional arg.
 - ADB device targeting is controlled by a single exported variable `ADB_SERIAL`. When set, every `adb` invocation in every script uses `adb -s "$ADB_SERIAL"`. When unset, `adb` uses the only connected device (or errors if multiple are connected).
 - Functions write nothing to stdout except via `log_*` helpers. Data written to files uses `>>` (append), never `>`.
-- Every function returns a non-zero exit code on error and logs the reason via `error_log`.
+- Every function returns a non-zero exit code on error and logs the reason via `log_error`.
 
 ---
 
@@ -17,96 +17,108 @@ Scripts live in `scripts/bash/`. Experiment entry points in `experiments/*.sh` s
 
 Provides logging helpers used by all other scripts.
 
-### Current state
-Two functions: `logger` (raw) and `info_log` (wrapper). Output goes to stdout only.
-
-### Required functions
+### Functions
 
 #### `logger(level, context, message)`
+
 Formats and prints one log line.
+
 - Output format: `[LEVEL] context (ISO-8601 timestamp): message`
 - Writes to stdout.
-- If `LOG_FILE` variable is set, also appends to that file path.
+- If `LOG_FILE` is set, also appends to that path.
 
-#### `info_log(context, message)`
-Calls `logger "INFO" ...`.
+#### `log_info(context, message)`
 
-#### `warn_log(context, message)`  
-Calls `logger "WARN" ...`. Writes to stderr as well as stdout/file.
+Logs an informational message.
 
-#### `error_log(context, message)`  
-Calls `logger "ERROR" ...`. Writes to stderr as well as stdout/file.
+#### `log_warn(context, message)`
 
-#### `debug_log(context, message)` *(new)*
-Calls `logger "DEBUG" ...`. Only emits output when `DEBUG=1` is set in the environment.
+Logs a warning. Writes to stdout, stderr, and `LOG_FILE` (if set).
+
+#### `log_error(context, message)`
+
+Logs an error. Writes to stdout, stderr, and `LOG_FILE` (if set).
+
+#### `log_debug(context, message)`
+
+Logs a debug message. Only emits output when `DEBUG=1` is set in the environment.
 
 ### Environment variables consumed
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `LOG_FILE` | unset | If set, all log output is also appended to this path |
-| `DEBUG` | unset | Set to `1` to enable `debug_log` output |
+
+| Variable   | Default | Description                                          |
+|------------|---------|------------------------------------------------------|
+| `LOG_FILE` | unset   | If set, all log output is also appended to this path |
+| `DEBUG`    | unset   | Set to `1` to enable `log_debug` output              |
 
 ---
 
-## 2. `adb.sh` *(new file)*
+## 2. `adb.sh`
 
-Centralizes ADB device management. All other scripts source this file instead of calling `adb` directly for device-sensitive operations.
+Centralizes ADB device management. All other scripts source this file instead of calling `adb` directly for device-sensitive operations. Guards against double-sourcing via `_ADB_SH_LOADED`.
 
-### Rationale
-Currently every script calls `adb` with no device selector. Adding `-s` to every individual call in three other scripts is error-prone and hard to maintain. A thin wrapper isolates this concern.
+Sources `logger.sh` internally — callers do not need to source `logger.sh` separately before `adb.sh`.
 
-### Required functions
+### Public functions
 
 #### `adb_cmd(...args)`
-Wrapper around `adb`. Injects `-s "$ADB_SERIAL"` when `ADB_SERIAL` is set.
+
+Transparent wrapper around `adb`. When `ADB_SERIAL` is set, injects `-s "$ADB_SERIAL"` before all other arguments. When unset, calls `adb` as-is.
+
 ```bash
-adb_cmd shell dumpsys meminfo   # becomes: adb -s <serial> shell dumpsys meminfo
+adb_cmd shell dumpsys meminfo   # → adb -s <serial> shell dumpsys meminfo
+adb_cmd logcat -d               # → adb -s <serial> logcat -d
 ```
-All other scripts call `adb_cmd` instead of `adb` directly.
+
+Returns the exit code of the underlying `adb` call. All other scripts call `adb_cmd` instead of `adb` directly.
 
 #### `adb_check_connection()`
-Validates that a usable device is available before an experiment starts.
-- If `ADB_SERIAL` is set: verifies that exact serial appears in `adb devices` with state `device`.
-- If `ADB_SERIAL` is unset: verifies exactly one device is connected. If zero or more than one, prints a clear error and returns 1.
-- Returns 0 on success, 1 on failure.
+
+Validates that a usable device is available. Intended to be called once at the start of an experiment (called by `runner` automatically when using `runner.sh`).
+
+- If `ADB_SERIAL` is set: checks that the exact serial appears in `adb devices` with state `device`. Logs an error and returns `1` if not found or not in `device` state.
+- If `ADB_SERIAL` is unset: counts lines in `adb devices` with state `device`. Returns `1` with a descriptive error if the count is zero ("no device connected") or greater than one ("multiple devices — set ADB_SERIAL").
+- Logs an info message and returns `0` on success.
 
 #### `adb_list_devices()`
-Prints connected device serials, one per line, excluding the header. Used by experiment scripts and the GUI app to populate device selection.
 
-### Environment variables consumed
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ADB_SERIAL` | unset | Target device serial. Set by experiment script or the GUI app before sourcing other scripts |
+Prints the serial of every connected device that is in `device` state, one per line. Excludes `offline` and `unauthorized` entries, and strips the state suffix — serials only.
+
+Used by experiment scripts and the GUI app to populate device selection.
+
+```bash
+$ adb_list_devices
+emulator-5554
+R3CN90FDEAJ
+```
+
+### Environment variables
+
+| Variable     | Default | Description                                                                                                                                                                      |
+|--------------|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ADB_SERIAL` | unset   | Target device serial. When set, every `adb_cmd` call targets this device via `-s`. Set by the experiment script, `runner --serial`, or `emulator_set_serial` before any ADB call |
 
 ---
 
 ## 3. `logger.sh` + `adb.sh` sourcing order
 
-Every script that uses ADB should source in this order:
+Every script that uses ADB sources in this order:
+
 ```bash
-source "$(dirname "$0")/logger.sh"
-source "$(dirname "$0")/adb.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/logger.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/adb.sh"
 ```
-`runner.sh`, `monitor.sh`, and `workload.sh` all source `logger.sh` directly today; after `adb.sh` is added, they source both.
+
+`BASH_SOURCE[0]` is used instead of `$0` so that the path resolves to the script's own directory regardless of which entry-point script sourced it.
+
+`runner.sh`, `monitor.sh`, and `workload.sh` all source both files.
 
 ---
 
 ## 4. `workload.sh`
 
-Provides functions for generating workload on the target Android device.
+Provides functions for generating workload on the target Android device. Sources `adb.sh` (and transitively `logger.sh`) — no additional sourcing needed by callers.
 
-### Current state
-Three functions: `run_monkey`, `run_packages`, `kill_packages`.
-
-### Bug fixes required
-
-| Bug | Current | Fix |
-|-----|---------|-----|
-| Double `-p` flag | `packages_params="-p "$(printf " -p %s" ...)` → `-p  -p pkg1 -p pkg2` | Build array; join with `-p`: `$(printf -- '-p %s ' "${packages[@]}")` |
-| `run_packages` / `kill_packages` take string, re-split | `local packages=($1)` | Accept `"$@"` to receive array elements as separate arguments, consistent with `run_monkey` |
-| Division by zero when `events_count=0` | `events_delay_ms=$((duration_ms / events_count))` | Guard: if `events_count` is 0, skip throttle entirely |
-
-### Required functions
+### Workload functions
 
 #### `run_monkey`
 
@@ -116,28 +128,27 @@ Launches Android Monkey on the target device.
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `-p` / `--package` | string (repeatable) | — | Package name to target. Pass once per package |
-| `-d` / `--duration` | integer (ms) | `0` | Total Monkey run duration in milliseconds. Used to derive `--throttle` |
-| `-e` / `--events` | integer | `100` | Total number of events. Combined with duration to compute inter-event delay |
-| `-i` / `--ignore-errors` | bool | `true` | Add `--ignore-crashes --ignore-timeouts --ignore-security-exceptions --kill-process-after-error` |
+| `-p` / `--packages` | string (repeatable) | — | Package name to target. Pass once per package |
+| `-d` / `--duration` | integer (ms) | `0` | Total run duration. Combined with `--events` to compute `--throttle`. Omitted when `0` |
+| `-e` / `--events` | integer | `0` | Total number of events. Combined with duration to compute inter-event delay |
+| `-i` / `--ignore-errors` | bool | `true` | Adds `--ignore-crashes --ignore-timeouts --ignore-security-exceptions --kill-process-after-error` |
 | `--event-preset` | string | `mixed` | Named event distribution preset (see below) |
 
-**Event distribution presets** (replaces `--enable-events` / `--enable-switches` flags):
+**Event distribution presets:**
 
-| Preset name | Description | Distribution |
-|-------------|-------------|-------------|
-| `mixed` | Touch, motion, navigation, minor app switches | touch 20, motion 20, trackball 15, nav 20, majornav 15, syskeys 0, appswitch 6, flip 2, pinchzoom 2 |
-| `gestures` | Touch and motion heavy, no switches | touch 20, motion 15, trackball 15, nav 20, majornav 15, syskeys 5, anyevent 5, flip 2, pinchzoom 3 |
+| Preset | Description | Distribution |
+|--------|-------------|--------------|
+| `mixed` | Touch, motion, navigation, minor app switches | touch 20, motion 20, trackball 15, nav 20, majornav 15, syskeys 0, appswitch 6, anyevent 0, flip 2, pinchzoom 2 |
+| `gestures` | Touch and motion heavy, no app switches | touch 20, motion 15, trackball 15, nav 20, majornav 15, syskeys 5, anyevent 5, flip 2, pinchzoom 3 |
 | `switches` | App switching only | appswitch 100, all others 0 |
 
-The preset replaces the current boolean `--enable-events` / `--enable-switches` combination. New presets can be added without changing the function interface.
+An unknown preset name logs an error via `log_error` and returns `1`. New presets can be added to the `case` block without changing the function interface.
 
 **Behavior:**
-1. If `duration > 0` and `events > 0`, compute `--throttle = duration / events`.
-2. Build `-p pkg` list.
-3. Log the full constructed Monkey command before executing.
-4. Call `adb_cmd shell monkey ...`.
-5. Return Monkey's exit code.
+1. If both `duration > 0` and `events > 0`, compute `--throttle = duration / events`. Otherwise `--throttle` is omitted.
+2. Build `-p pkg1 -p pkg2 ...` list via `printf -- '-p %s '`.
+3. Log the full constructed Monkey command via `log_info`.
+4. Call `adb_cmd shell monkey ...` and return its exit code.
 
 ---
 
@@ -148,8 +159,8 @@ Launches the default launcher activity of each package.
 **Parameters:** `"$@"` — package names as separate arguments.
 
 **Behavior:**
-- For each package: `adb_cmd shell monkey -p "$pkg" -c android.intent.category.LAUNCHER 1`
-- Log each launch attempt.
+- Logs each launch attempt via `log_info`.
+- For each package: `adb_cmd shell monkey -p "$package" -c android.intent.category.LAUNCHER 1`.
 
 ---
 
@@ -160,25 +171,14 @@ Force-stops each package.
 **Parameters:** `"$@"` — package names as separate arguments.
 
 **Behavior:**
-- For each package: `adb_cmd shell am force-stop "$pkg"`
-- Log each stop attempt.
-
----
-
-#### `restart_packages` *(new)*
-
-Convenience wrapper: calls `kill_packages "$@"` then `run_packages "$@"`.
-
-Used in aging experiments that include forced restarts as the on-time action.
+- Logs each stop attempt via `log_info`.
+- For each package: `adb_cmd shell am force-stop "$package"`.
 
 ---
 
 ## 5. `monitor.sh`
 
-Provides functions that collect system data from the device and append it to output files.
-
-### Current state
-Five functions: `init_output_dirs`, `logcat_monitor`, `dumpsys_service_monitor`, `proc_tasks_monitor`, `bug_reports_monitor`.
+Provides functions that collect system data from the device and append it to output files. Sources `adb.sh` (and transitively `logger.sh`) — no additional sourcing needed by callers.
 
 ### Output directory contract
 
@@ -194,20 +194,19 @@ output/<name>/<YYYY-MM-DD_HH-MM-SS>/
 │   └── ...
 ├── proctasks/
 │   └── proctasks.txt
-├── batterystats/          (new)
-│   └── batterystats.txt
 └── bugReports/
 ```
 
-Each monitor appends a timestamp separator line before each data snapshot so intervals can be distinguished during parsing:
+Each monitor writes a separator line before each data snapshot via the private `_monitor_separator` helper:
+
 ```
-=== 2025-01-15 14:32:00 ===
+=== Recording 2025-01-15 14:32:00 ===
 <data>
 ```
 
-### Required functions
+### Monitor functions
 
-#### `init_output_dirs(name)`
+#### `init_output_dirs`
 
 Creates the output directory tree for one experiment run.
 
@@ -216,7 +215,7 @@ Creates the output directory tree for one experiment run.
 
 **Behavior:**
 - Sets `OUTPUT_DIR_PATH="./output/$1/$(date +"%Y-%m-%d_%H-%M-%S")"`.
-- Creates subdirectories: `logcat/`, `dumpsys/`, `proctasks/`, `batterystats/`, `bugReports/`.
+- Creates subdirectories: `logcat/`, `dumpsys/`, `proctasks/`, `bugReports/`.
 - Logs the resolved path.
 
 ---
@@ -229,19 +228,20 @@ Collects output of `adb shell dumpsys <service>` and appends to a file.
 
 | Flag | Type | Description |
 |------|------|-------------|
-| `-s` / `--service` | string | dumpsys service name (e.g. `gfxinfo`, `meminfo`, `procstats`) |
+| `-s` / `--service` | string (required) | dumpsys service name (e.g. `gfxinfo`, `meminfo`, `procstats`) |
 | `-p` / `--package` | string (repeatable) | Package to pass to the service. Omit for services that don't take a package |
 | `-o` / `--options` | string | Extra flags appended after the package name (e.g. `framestats`, `reset`, `-c`, `framestats reset`) |
 
-**Current bug:** the third positional argument (options like `"framestats"`) is absorbed into the packages array. Named flags fix this.
+Returns `1` if `-s` is not provided.
 
 **Behavior:**
-- If packages provided: for each package, append to `$OUTPUT_DIR_PATH/dumpsys/<service>-<package>.txt`.
-- If no packages: append to `$OUTPUT_DIR_PATH/dumpsys/<service>.txt`.
-- Separator line written before each snapshot.
+
+- If packages provided: for each package, appends separator + output to `$OUTPUT_DIR_PATH/dumpsys/<service>-<package>.txt`.
+- If no packages: appends separator + output to `$OUTPUT_DIR_PATH/dumpsys/<service>.txt`.
 - Calls `adb_cmd shell dumpsys "$service" ["$package"] [$options]`.
 
 **Example calls:**
+
 ```bash
 dumpsys_service_monitor -s gfxinfo -p com.android.chrome -p com.android.contacts -o "framestats reset"
 dumpsys_service_monitor -s meminfo -o "-c"
@@ -257,14 +257,10 @@ Dumps current logcat buffer to file and clears it.
 
 **Parameters:** none.
 
-**Current bug:** `adb logcat -c` is called immediately after `-d`, risking a race condition on slow connections.
-
 **Behavior:**
-1. Append separator + `adb_cmd logcat -d -v monotonic` to `logcat/logcat.txt`.
-2. Wait for the dump to complete (the pipe must flush before clearing).
-3. `adb_cmd logcat -c` to clear the buffer.
 
-**Note:** logcat dump and clear are inherently sequential — the implementation must ensure step 1 fully completes before step 3.
+1. Appends separator + `adb_cmd logcat -d -v monotonic` to `logcat/logcat.txt`.
+2. Clears the buffer with `adb_cmd logcat -c` — runs only after the dump exits successfully (`&&`), preventing a race condition on slow connections.
 
 ---
 
@@ -272,27 +268,12 @@ Dumps current logcat buffer to file and clears it.
 
 Reads `/proc/<pid>/stat` for all running processes and appends to file.
 
-**Current bug:** one `adb shell cat` call per PID — very slow for hundreds of processes.
-
 **Behavior:**
-1. Get list of numeric PIDs: `adb_cmd shell ls /proc/ | grep '^[0-9]*$'`
-2. Construct full paths: `/proc/<pid>/stat` for each PID.
-3. Issue a **single** `adb_cmd shell cat /proc/1/stat /proc/2/stat ...` with all paths.
-4. Append separator + output to `proctasks/proctasks.txt`.
 
-**Constraint:** the argument list can exceed shell limits for devices with many processes. Batch into groups of 200 PIDs if needed.
+1. Gets list of numeric PIDs: `adb_cmd shell ls /proc/ | grep '^[0-9]*$'`
+2. For each PID: `adb_cmd shell cat /proc/<pid>/stat` appended to `proctasks/proctasks.txt`.
 
----
-
-#### `batterystats_monitor` *(new)*
-
-Collects battery statistics.
-
-**Parameters:** none.
-
-**Behavior:**
-- Append `adb_cmd shell dumpsys batterystats` to `batterystats/batterystats.txt`.
-- Battery stats accumulate since last reset by default, which is correct for aging analysis.
+> **Known limitation:** issues one ADB call per PID — slow for devices with many processes. Batching into single multi-path `cat` calls is a planned improvement.
 
 ---
 
@@ -304,16 +285,7 @@ Captures a full bug report.
 
 **Behavior:**
 - Calls `adb_cmd bugreport "$OUTPUT_DIR_PATH/bugReports"`.
-- Intended for use at the start and end of an experiment, not every iteration (it is slow and produces large files).
-
----
-
-#### `list_installed_packages()` *(new)*
-
-Utility, not a monitor. Lists installed packages on the device. Used by the GUI app to populate the package selection list.
-
-**Behavior:**
-- `adb_cmd shell pm list packages` stripped of the `package:` prefix, one package per line.
+- Intended for use at the start and end of an experiment only — slow and produces large files.
 
 ---
 
@@ -438,7 +410,7 @@ No logic beyond defining callbacks and calling `runner`. Error handling and orch
 | File | New functions |
 |------|--------------|
 | `adb.sh` *(new)* | `adb_cmd`, `adb_check_connection`, `adb_list_devices` |
-| `logger.sh` | `warn_log`, `error_log`, `debug_log` |
+| `logger.sh` | `log_warn`, `log_error`, `log_debug` |
 | `workload.sh` | `restart_packages` |
 | `monitor.sh` | `batterystats_monitor`, `list_installed_packages` |
 

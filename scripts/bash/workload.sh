@@ -1,30 +1,18 @@
 #!/bin/bash
 
-# Function to run the Android monkey tool.
-#
-# Parameters:
-# -p | --packages: List of packages to run the monkey on
-# -d | --duration: Duration of the monkey execution in milliseconds
-# -e | --events: Number of events to generate
-# -i | --ignore-errors: Ignore errors during monkey execution
-# -ee | --enable-events: Enable events in the monkey execution
-# -es | --enable-switches: Enable app switches in the monkey execution
-#
-# Example usage:
-# run_monkey "package1 package2" 1000 50 true true true
+source "$(dirname "${BASH_SOURCE[0]}")/adb.sh"
 
 run_monkey() {
     local packages=()
     local duration_ms=0
     local events_count=0
     local ignore_errors=true
-    local enable_events=true
-    local enable_switches=true
+    local event_preset="mixed"
 
     while [[ $# -gt 0 ]]; do
         case $1 in
         -p | --packages)
-            packages+=($2)
+            packages+=("$2")
             shift 2
             ;;
         -d | --duration)
@@ -39,12 +27,8 @@ run_monkey() {
             ignore_errors=$2
             shift 2
             ;;
-        -ee | --enable-events)
-            enable_events=$2
-            shift 2
-            ;;
-        -es | --enable-switches)
-            enable_switches=$2
+        --event-preset)
+            event_preset=$2
             shift 2
             ;;
         *)
@@ -53,11 +37,14 @@ run_monkey() {
         esac
     done
 
-    local events_delay_ms=$((duration_ms / events_count))
+    local events_delay_ms=0
+    if [[ $duration_ms -gt 0 && $events_count -gt 0 ]]; then
+        events_delay_ms=$((duration_ms / events_count))
+    fi
 
     local packages_params=""
-    if [ ${#packages[@]} -gt 0 ]; then
-        packages_params="-p "$(printf " -p %s" "${packages[@]}")
+    if [[ ${#packages[@]} -gt 0 ]]; then
+        packages_params=$(printf -- '-p %s ' "${packages[@]}")
     fi
 
     local throttle_param=""
@@ -71,29 +58,37 @@ run_monkey() {
     fi
 
     local events_params=""
-    if [ "$enable_events" == "true" ] && [ "$enable_switches" == "true" ]; then
+    case "$event_preset" in
+    mixed)
         events_params="--pct-touch 20 --pct-motion 20 --pct-trackball 15 --pct-nav 20 --pct-majornav 15 --pct-syskeys 0 --pct-appswitch 6 --pct-anyevent 0 --pct-flip 2 --pct-pinchzoom 2"
-    elif [ "$enable_events" == "true" ]; then
+        ;;
+    gestures)
         events_params="--pct-touch 20 --pct-motion 15 --pct-trackball 15 --pct-nav 20 --pct-majornav 15 --pct-syskeys 5 --pct-anyevent 5 --pct-flip 2 --pct-pinchzoom 3"
-    elif [ "$enable_switches" == "true" ]; then
+        ;;
+    switches)
         events_params="--pct-touch 0 --pct-motion 0 --pct-trackball 0 --pct-nav 0 --pct-majornav 0 --pct-syskeys 0 --pct-appswitch 100 --pct-anyevent 0 --pct-flip 0 --pct-pinchzoom 0"
-    fi
+        ;;
+    *)
+        log_error "run_monkey" "Unknown event preset: '$event_preset'. Valid values: mixed, gestures, switches"
+        return 1
+        ;;
+    esac
 
-    echo "[Workload Generator] all params: $packages_params -v -v $throttle_param $events_params $ignore_params $events_count"
+    log_info "run_monkey" "monkey $packages_params-v -v $throttle_param $events_params $ignore_params $events_count"
 
-    adb shell monkey $packages_params -v -v $throttle_param $events_params $ignore_params $events_count
+    adb_cmd shell monkey $packages_params -v -v $throttle_param $events_params $ignore_params $events_count
 }
 
 run_packages() {
-    local packages=($1)
-    for package in "${packages[@]}"; do
-        adb shell monkey -p "$package" -c android.intent.category.LAUNCHER 1
+    for package in "$@"; do
+        log_info "run_packages" "Launching $package"
+        adb_cmd shell monkey -p "$package" -c android.intent.category.LAUNCHER 1
     done
 }
 
 kill_packages() {
-    local packages=($1)
-    for package in "${packages[@]}"; do
-        adb shell am force-stop "$package"
+    for package in "$@"; do
+        log_info "kill_packages" "Stopping $package"
+        adb_cmd shell am force-stop "$package"
     done
 }
