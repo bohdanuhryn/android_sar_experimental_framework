@@ -7,6 +7,10 @@ log_monitor() {
     log_info "monitor" "$1"
 }
 
+_monitor_separator() {
+    echo "=== Recording $(date +"%Y-%m-%d %H:%M:%S") ==="
+}
+
 OUTPUT_DIR_NAME="default"
 OUTPUT_DIR_TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
 OUTPUT_DIR_PATH="./output/$OUTPUT_DIR_NAME/$OUTPUT_DIR_TIMESTAMP"
@@ -76,12 +80,12 @@ dumpsys_service_monitor() {
     if [[ ${#packages[@]} -gt 0 ]]; then
         for package in "${packages[@]}"; do
             local full_path="$path/$service-$package.txt"
-            echo "$(date)" >> "$full_path"
+            _monitor_separator >> "$full_path"
             adb_cmd shell dumpsys "$service" "$package" $options >> "$full_path"
         done
     else
         local full_path="$path/$service.txt"
-        echo "$(date)" >> "$full_path"
+        _monitor_separator >> "$full_path"
         adb_cmd shell dumpsys "$service" $options >> "$full_path"
     fi
     log_monitor "Dumpsys service $service saved to $path"
@@ -92,7 +96,7 @@ logcat_monitor() {
     local path="$OUTPUT_DIR_PATH/logcat/logcat.txt"
 
     log_monitor "Capturing LogCat..."
-    echo "$(date)" >> "$path"
+    _monitor_separator >> "$path"
     adb_cmd logcat -d -v monotonic >> "$path"
     adb_cmd logcat -c
     log_monitor "LogCat saved to $path"
@@ -103,7 +107,7 @@ proc_tasks_monitor() {
     local path="$OUTPUT_DIR_PATH/proctasks/proctasks.txt"
 
     log_monitor "Monitoring /proc tasks..."
-    echo "$(date)" >> "$path"
+    _monitor_separator >> "$path"
     local dirs=$(adb_cmd shell ls /proc/ | grep '^[0-9]*$')
 
     for dir in $dirs; do
