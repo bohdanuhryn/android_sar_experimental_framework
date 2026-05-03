@@ -97,8 +97,7 @@ logcat_monitor() {
 
     log_monitor "Capturing LogCat..."
     _monitor_separator >> "$path"
-    adb_cmd logcat -d -v monotonic >> "$path"
-    adb_cmd logcat -c
+    adb_cmd logcat -d -v monotonic >> "$path" && adb_cmd logcat -c
     log_monitor "LogCat saved to $path"
 }
 
