@@ -61,8 +61,8 @@ run_monkey() {
     fi
 
     local packages_params=""
-    if [ ${#packages[@]} -gt 0 ]; then
-        packages_params="-p "$(printf " -p %s" "${packages[@]}")
+    if [[ ${#packages[@]} -gt 0 ]]; then
+        packages_params=$(printf -- '-p %s ' "${packages[@]}")
     fi
 
     local throttle_param=""
