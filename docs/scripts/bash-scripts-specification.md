@@ -178,10 +178,7 @@ Force-stops each package.
 
 ## 5. `monitor.sh`
 
-Provides functions that collect system data from the device and append it to output files.
-
-### Current state
-Five functions: `init_output_dirs`, `logcat_monitor`, `dumpsys_service_monitor`, `proc_tasks_monitor`, `bug_reports_monitor`.
+Provides functions that collect system data from the device and append it to output files. Sources `adb.sh` (and transitively `logger.sh`) — no additional sourcing needed by callers.
 
 ### Output directory contract
 
@@ -197,20 +194,19 @@ output/<name>/<YYYY-MM-DD_HH-MM-SS>/
 │   └── ...
 ├── proctasks/
 │   └── proctasks.txt
-├── batterystats/          (new)
-│   └── batterystats.txt
 └── bugReports/
 ```
 
-Each monitor appends a timestamp separator line before each data snapshot so intervals can be distinguished during parsing:
+Each monitor writes a separator line before each data snapshot via the private `_monitor_separator` helper:
+
 ```
-=== 2025-01-15 14:32:00 ===
+=== Recording 2025-01-15 14:32:00 ===
 <data>
 ```
 
-### Required functions
+### Monitor functions
 
-#### `init_output_dirs(name)`
+#### `init_output_dirs`
 
 Creates the output directory tree for one experiment run.
 
@@ -219,7 +215,7 @@ Creates the output directory tree for one experiment run.
 
 **Behavior:**
 - Sets `OUTPUT_DIR_PATH="./output/$1/$(date +"%Y-%m-%d_%H-%M-%S")"`.
-- Creates subdirectories: `logcat/`, `dumpsys/`, `proctasks/`, `batterystats/`, `bugReports/`.
+- Creates subdirectories: `logcat/`, `dumpsys/`, `proctasks/`, `bugReports/`.
 - Logs the resolved path.
 
 ---
@@ -232,19 +228,20 @@ Collects output of `adb shell dumpsys <service>` and appends to a file.
 
 | Flag | Type | Description |
 |------|------|-------------|
-| `-s` / `--service` | string | dumpsys service name (e.g. `gfxinfo`, `meminfo`, `procstats`) |
+| `-s` / `--service` | string (required) | dumpsys service name (e.g. `gfxinfo`, `meminfo`, `procstats`) |
 | `-p` / `--package` | string (repeatable) | Package to pass to the service. Omit for services that don't take a package |
 | `-o` / `--options` | string | Extra flags appended after the package name (e.g. `framestats`, `reset`, `-c`, `framestats reset`) |
 
-**Current bug:** the third positional argument (options like `"framestats"`) is absorbed into the packages array. Named flags fix this.
+Returns `1` if `-s` is not provided.
 
 **Behavior:**
-- If packages provided: for each package, append to `$OUTPUT_DIR_PATH/dumpsys/<service>-<package>.txt`.
-- If no packages: append to `$OUTPUT_DIR_PATH/dumpsys/<service>.txt`.
-- Separator line written before each snapshot.
+
+- If packages provided: for each package, appends separator + output to `$OUTPUT_DIR_PATH/dumpsys/<service>-<package>.txt`.
+- If no packages: appends separator + output to `$OUTPUT_DIR_PATH/dumpsys/<service>.txt`.
 - Calls `adb_cmd shell dumpsys "$service" ["$package"] [$options]`.
 
 **Example calls:**
+
 ```bash
 dumpsys_service_monitor -s gfxinfo -p com.android.chrome -p com.android.contacts -o "framestats reset"
 dumpsys_service_monitor -s meminfo -o "-c"
@@ -260,14 +257,10 @@ Dumps current logcat buffer to file and clears it.
 
 **Parameters:** none.
 
-**Current bug:** `adb logcat -c` is called immediately after `-d`, risking a race condition on slow connections.
-
 **Behavior:**
-1. Append separator + `adb_cmd logcat -d -v monotonic` to `logcat/logcat.txt`.
-2. Wait for the dump to complete (the pipe must flush before clearing).
-3. `adb_cmd logcat -c` to clear the buffer.
 
-**Note:** logcat dump and clear are inherently sequential — the implementation must ensure step 1 fully completes before step 3.
+1. Appends separator + `adb_cmd logcat -d -v monotonic` to `logcat/logcat.txt`.
+2. Clears the buffer with `adb_cmd logcat -c` — runs only after the dump exits successfully (`&&`), preventing a race condition on slow connections.
 
 ---
 
@@ -275,27 +268,12 @@ Dumps current logcat buffer to file and clears it.
 
 Reads `/proc/<pid>/stat` for all running processes and appends to file.
 
-**Current bug:** one `adb shell cat` call per PID — very slow for hundreds of processes.
-
 **Behavior:**
-1. Get list of numeric PIDs: `adb_cmd shell ls /proc/ | grep '^[0-9]*$'`
-2. Construct full paths: `/proc/<pid>/stat` for each PID.
-3. Issue a **single** `adb_cmd shell cat /proc/1/stat /proc/2/stat ...` with all paths.
-4. Append separator + output to `proctasks/proctasks.txt`.
 
-**Constraint:** the argument list can exceed shell limits for devices with many processes. Batch into groups of 200 PIDs if needed.
+1. Gets list of numeric PIDs: `adb_cmd shell ls /proc/ | grep '^[0-9]*$'`
+2. For each PID: `adb_cmd shell cat /proc/<pid>/stat` appended to `proctasks/proctasks.txt`.
 
----
-
-#### `batterystats_monitor` *(new)*
-
-Collects battery statistics.
-
-**Parameters:** none.
-
-**Behavior:**
-- Append `adb_cmd shell dumpsys batterystats` to `batterystats/batterystats.txt`.
-- Battery stats accumulate since last reset by default, which is correct for aging analysis.
+> **Known limitation:** issues one ADB call per PID — slow for devices with many processes. Batching into single multi-path `cat` calls is a planned improvement.
 
 ---
 
@@ -307,16 +285,7 @@ Captures a full bug report.
 
 **Behavior:**
 - Calls `adb_cmd bugreport "$OUTPUT_DIR_PATH/bugReports"`.
-- Intended for use at the start and end of an experiment, not every iteration (it is slow and produces large files).
-
----
-
-#### `list_installed_packages()` *(new)*
-
-Utility, not a monitor. Lists installed packages on the device. Used by the GUI app to populate the package selection list.
-
-**Behavior:**
-- `adb_cmd shell pm list packages` stripped of the `package:` prefix, one package per line.
+- Intended for use at the start and end of an experiment only — slow and produces large files.
 
 ---
 
